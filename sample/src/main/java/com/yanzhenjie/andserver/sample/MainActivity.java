@@ -19,6 +19,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -34,7 +35,7 @@ import java.util.List;
 /**
  * Created by Zhenjie Yan on 2018/6/9.
  */
-public class MainActivity extends AppCompatActivity implements View.OnClickListener {
+public class MainActivity extends AppCompatActivity implements ServerManager.OnServerStateChangedListener {
 
     private ServerManager mServerManager;
 
@@ -58,53 +59,45 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mBtnBrowser = findViewById(R.id.btn_browse);
         mTvMessage = findViewById(R.id.tv_message);
 
-        mBtnStart.setOnClickListener(this);
-        mBtnStop.setOnClickListener(this);
-        mBtnBrowser.setOnClickListener(this);
+        mBtnStart.setOnClickListener(v -> {
+            showDialog();
+            mServerManager.startServer();
+        });
+        mBtnStop.setOnClickListener(v -> {
+            showDialog();
+            mServerManager.stopServer();
+        });
+        mBtnBrowser.setOnClickListener(v -> {
+            if (!TextUtils.isEmpty(mRootUrl)) {
+                Intent intent = new Intent();
+                intent.setAction("android.intent.action.VIEW");
+                intent.setData(Uri.parse(mRootUrl));
+                startActivity(intent);
+            }
+        });
 
         // AndServer run in the service.
-        mServerManager = new ServerManager(this);
+        mServerManager = ServerManager.getInstance(getApplication(), this);
         mServerManager.register();
 
         // startServer;
         mBtnStart.performClick();
+
+        Log.e("lmsg","onCreate");
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        mServerManager.unRegister();
+        ServerManager.shutdown();
+        Log.e("lmsg","onDestroy");
     }
 
-    @Override
-    public void onClick(View v) {
-        int id = v.getId();
-        switch (id) {
-            case R.id.btn_start: {
-                showDialog();
-                mServerManager.startServer();
-                break;
-            }
-            case R.id.btn_stop: {
-                showDialog();
-                mServerManager.stopServer();
-                break;
-            }
-            case R.id.btn_browse: {
-                if (!TextUtils.isEmpty(mRootUrl)) {
-                    Intent intent = new Intent();
-                    intent.setAction("android.intent.action.VIEW");
-                    intent.setData(Uri.parse(mRootUrl));
-                    startActivity(intent);
-                }
-                break;
-            }
-        }
-    }
 
     /**
      * Start notify.
      */
+    @Override
     public void onServerStart(String ip) {
         closeDialog();
         mBtnStart.setVisibility(View.GONE);
@@ -126,6 +119,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     /**
      * Error notify.
      */
+    @Override
     public void onServerError(String message) {
         closeDialog();
         mRootUrl = null;
@@ -138,6 +132,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     /**
      * Stop notify.
      */
+    @Override
     public void onServerStop() {
         closeDialog();
         mRootUrl = null;

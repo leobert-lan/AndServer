@@ -17,8 +17,12 @@ package com.yanzhenjie.andserver.sample;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.util.Log;
+
+import androidx.annotation.Nullable;
 
 /**
  * Created by Zhenjie Yan on 2018/6/9.
@@ -40,6 +44,7 @@ public class ServerManager extends BroadcastReceiver {
      * @param context context.
      */
     public static void onServerStart(Context context, String hostAddress) {
+        Log.e("lmsg", "sendB:server started");
         sendBroadcast(context, CMD_VALUE_START, hostAddress);
     }
 
@@ -72,12 +77,33 @@ public class ServerManager extends BroadcastReceiver {
         context.sendBroadcast(broadcast);
     }
 
-    private MainActivity mActivity;
-    private Intent mService;
 
-    public ServerManager(MainActivity activity) {
-        this.mActivity = activity;
-        mService = new Intent(activity, CoreService.class);
+    private static ServerManager instance = null;
+
+    public static ServerManager getInstance(ContextWrapper contextWrapper, @Nullable OnServerStateChangedListener onServerStateChangedListener) {
+        if (instance == null)
+            instance = new ServerManager(contextWrapper, onServerStateChangedListener);
+        return instance;
+    }
+
+    public static void shutdown() {
+        if (instance != null) {
+            instance.stopServer();
+            instance.unRegister();
+            instance = null;
+        }
+    }
+
+    private final ContextWrapper contextWrapper;
+    private final Intent mService;
+
+    @Nullable
+    private final OnServerStateChangedListener onServerStateChangedListener;
+
+    private ServerManager(ContextWrapper contextWrapper, @Nullable OnServerStateChangedListener onServerStateChangedListener) {
+        this.contextWrapper = contextWrapper;
+        mService = new Intent(contextWrapper, CoreService.class);
+        this.onServerStateChangedListener = onServerStateChangedListener;
     }
 
     /**
@@ -85,45 +111,64 @@ public class ServerManager extends BroadcastReceiver {
      */
     public void register() {
         IntentFilter filter = new IntentFilter(ACTION);
-        mActivity.registerReceiver(this, filter);
+        contextWrapper.registerReceiver(this, filter);
     }
 
     /**
      * UnRegister broadcast.
      */
-    public void unRegister() {
-        mActivity.unregisterReceiver(this);
+    private void unRegister() {
+        contextWrapper.unregisterReceiver(this);
     }
 
     public void startServer() {
-        mActivity.startService(mService);
+        contextWrapper.startService(mService);
     }
 
     public void stopServer() {
-        mActivity.stopService(mService);
+        contextWrapper.stopService(mService);
     }
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        Log.e("lmsg", "receivedB:"+intent.getAction()+" "+intent.getIntExtra(CMD_KEY, 0));
+        if (onServerStateChangedListener == null) return;
         String action = intent.getAction();
         if (ACTION.equals(action)) {
             int cmd = intent.getIntExtra(CMD_KEY, 0);
             switch (cmd) {
                 case CMD_VALUE_START: {
                     String ip = intent.getStringExtra(MESSAGE_KEY);
-                    mActivity.onServerStart(ip);
+                    onServerStateChangedListener.onServerStart(ip);
                     break;
                 }
                 case CMD_VALUE_ERROR: {
                     String error = intent.getStringExtra(MESSAGE_KEY);
-                    mActivity.onServerError(error);
+                    onServerStateChangedListener.onServerError(error);
                     break;
                 }
                 case CMD_VALUE_STOP: {
-                    mActivity.onServerStop();
+                    onServerStateChangedListener.onServerStop();
                     break;
                 }
             }
         }
+    }
+
+    public interface OnServerStateChangedListener {
+        /**
+         * Start notify.
+         */
+        void onServerStart(String ip);
+
+        /**
+         * Error notify.
+         */
+        void onServerError(String message);
+
+        /**
+         * Stop notify.
+         */
+        void onServerStop();
     }
 }

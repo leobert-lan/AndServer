@@ -18,6 +18,7 @@ package com.yanzhenjie.andserver.sample;
 import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
+import android.util.Log;
 
 import androidx.annotation.Nullable;
 
@@ -38,37 +39,53 @@ public class CoreService extends Service {
     @Override
     public void onCreate() {
         mServer = AndServer.webServer(this)
-            .port(8080)
-            .timeout(10, TimeUnit.SECONDS)
-            .listener(new Server.ServerListener() {
-                @Override
-                public void onStarted() {
-                    InetAddress address = NetUtils.getLocalIPAddress();
-                    ServerManager.onServerStart(CoreService.this, address.getHostAddress());
-                }
+                .port(8080)
+                .timeout(10, TimeUnit.SECONDS)
+                .listener(new Server.ServerListener() {
+                    @Override
+                    public void onStarted() {
+                        Log.e("lmsg", "server started");
+                        InetAddress address = NetUtils.getLocalIPAddress();
+                        ServerManager.onServerStart(CoreService.this, address.getHostAddress());
+                    }
 
-                @Override
-                public void onStopped() {
-                    ServerManager.onServerStop(CoreService.this);
-                }
+                    @Override
+                    public void onStopped() {
+                        Log.e("lmsg", "server stoped");
+                        ServerManager.onServerStop(CoreService.this);
+                    }
 
-                @Override
-                public void onException(Exception e) {
-                    e.printStackTrace();
-                    ServerManager.onServerError(CoreService.this, e.getMessage());
-                }
-            })
-            .build();
+                    @Override
+                    public void onException(Exception e) {
+                        Log.e("lmsg", "server exception", e);
+                        ServerManager.onServerError(CoreService.this, e.getMessage());
+                    }
+                })
+                .build();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.e("lmsg", "onStartCommand");
         startServer();
         return START_STICKY;
     }
 
     @Override
+    public void onRebind(Intent intent) {
+        Log.e("lmsg", "onRebind");
+        super.onRebind(intent);
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        Log.e("lmsg", "onUnbind");
+        return super.onUnbind(intent);
+    }
+
+    @Override
     public void onDestroy() {
+        Log.e("lmsg", "service onDestroy");
         stopServer();
         super.onDestroy();
     }
@@ -90,6 +107,7 @@ public class CoreService extends Service {
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
+        Log.e("lmsg", "onBind");
         return null;
     }
 }
